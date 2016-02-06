@@ -1,0 +1,8 @@
+/bin/
+/target/
+/error.txt
+/first_successful_test.txt
+/.classpath
+/.project
+/.settings/
+/video.webm
