@@ -123,6 +123,7 @@ public class MessagePack {
 	 * @return Accuracy b/w a and b [0,100]
 	 */
 	public double getAccuracy(String a, String b){
+		b = b.substring(0, b.length() - 3);
 		testedAccuracies ++;
 		if(a.length() == 0) return 0;
 		double similarBits = 0;
@@ -133,7 +134,7 @@ public class MessagePack {
 			else binaryInaccuracies[i] ++;
 		}
 		
-		return ( (similarBits * 1.0f) / a.length()) * 100.00;
+		return ( (similarBits * 1.0f) / 77) * 100.00;
 	}
 	
 	public static String invertPattern(String pattern){

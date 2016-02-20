@@ -1,5 +1,7 @@
 package edu.rutgers.vmimo;
 
+import java.awt.Dimension;
+import java.awt.Toolkit;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -11,9 +13,9 @@ import javax.swing.JFrame;
 
 import org.apache.commons.io.FileUtils;
 
+import edu.rutgers.vmimo.socket.SocketConnection;
 import uk.co.caprica.vlcj.component.EmbeddedMediaPlayerComponent;
 import uk.co.caprica.vlcj.discovery.NativeDiscovery;
-import edu.rutgers.vmimo.socket.SocketConnection;
 
 public class VmimoAnalytics {
 
@@ -49,27 +51,28 @@ public class VmimoAnalytics {
 		new NativeDiscovery().discover();
 		
 		//Testing
-		boolean[] reference = {false, false, true, true, true, true, false, false, false, true, true, true, false, true, false, false, true, true, true, false, false, false, false, true, true, false, true, true, false, false, true, true, false, true, false, false, false, true, true, false, false, true, false, false, true, true, false, false, false, false, false, true, false, true, true, true, false, false, true, false, true, true, false, false, false, true, false, true, false, true, false, false, true, false, true, false, false, true, true, true};
-		for(boolean b : reference){
-			if(b) System.out.print("1");
-			else System.out.print("0");
+		if(1 / 2 == 12 && false){
+			boolean[] reference = {false, false, true, true, true, true, false, false, false, true, true, true, false, true, false, false, true, true, true, false, false, false, false, true, true, false, true, true, false, false, true, true, false, true, false, false, false, true, true, false, false, true, false, false, true, true, false, false, false, false, false, true, false, true, true, true, false, false, true, false, true, true, false, false, false, true, false, true, false, true, false, false, true, false, true, false, false, true, true, true};
+			for(boolean b : reference){
+				if(b) System.out.print("1");
+				else System.out.print("0");
+			}
+			
+			System.out.println();
+			System.out.println(MessagePack.convertStringToBinary("abcdefghijk"));
+			
+			int[] ref = {1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0};
+			String ninetyFiveCorrectBinary = "";
+			for(int i : ref){
+				if(i == 1) ninetyFiveCorrectBinary += "1";
+				else ninetyFiveCorrectBinary += "0";
+			}
+			System.out.println(ninetyFiveCorrectBinary);
+			File mFile = new File(MessagePack._MESSAGES_SAVE_PATH);
+			try{mFile.createNewFile();}catch(Exception e){}
+			messagePack = new MessagePack(mFile);
+			System.out.println(messagePack.getAccuracy(ninetyFiveCorrectBinary, MessagePack.convertStringToBinary("abcdefghijk")));
 		}
-		
-		System.out.println();
-		System.out.println(MessagePack.convertStringToBinary("abcdefghijk"));
-		
-		int[] ref = {1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0};
-		String ninetyFiveCorrectBinary = "";
-		for(int i : ref){
-			if(i == 1) ninetyFiveCorrectBinary += "1";
-			else ninetyFiveCorrectBinary += "0";
-		}
-		System.out.println(ninetyFiveCorrectBinary);
-		File mFile = new File(MessagePack._MESSAGES_SAVE_PATH);
-		try{mFile.createNewFile();}catch(Exception e){}
-		messagePack = new MessagePack(mFile);
-		System.out.println(messagePack.getAccuracy(ninetyFiveCorrectBinary, MessagePack.convertStringToBinary("abcdefghijk")));
-		
 		
 		createDisplayWindow();
 		Thread socketThread = null;
@@ -114,8 +117,11 @@ public class VmimoAnalytics {
 
 	private static void createDisplayWindow(){
 		window = new JFrame("RU VMIMO Bench Display");
-		window.setBounds(100, 100, 600, 400);
+		window.setBounds(100, 100, 560 + 100, 448 + 100);
+		//window.setExtendedState(JFrame.MAXIMIZED_BOTH);
 		window.setAlwaysOnTop(true);
+		Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
+		window.setLocation(dim.width/2-window.getSize().width/2, dim.height/2-window.getSize().height/2);
 		mediaPlayerComponent = new EmbeddedMediaPlayerComponent();
 		mediaPlayerComponent.getMediaPlayer().setRepeat(true);
         window.setContentPane(mediaPlayerComponent);
@@ -171,7 +177,7 @@ public class VmimoAnalytics {
 					for(int delta = startingDelta; delta < endingDelta + deltaStep; delta += deltaStep){
 						for(int currentMessage = 0; currentMessage < messagePack._PACK_SIZE; currentMessage ++){
 							try {
-								File tempFile = new File(System.getProperty("user.dir"), "vmimo_video_" + fps + "" + delta + "" + currentMessage + ".webm");
+								File tempFile = new File(System.getProperty("user.dir"), "vmimo_video_" + imageID + "_" +fps + "_" + delta + "_" + currentMessage + ".webm");
 								FileUtils.copyURLToFile(new URL("http://vmimo.convex.vision/encode/" + imageID + "/" + messagePack.messages[currentMessage] + 
 										"?alpha=" + delta + "&fps=" + fps), tempFile);
 							} catch (MalformedURLException e) {e.printStackTrace();} 
@@ -197,10 +203,10 @@ public class VmimoAnalytics {
 				for(int currentMessage = 0; currentMessage < messagePack._PACK_SIZE; currentMessage ++){
 					double messageAccuracySum = 0;
 					System.out.println("Current: " + messagePack.binaryMessages[currentMessage]);
-					File videoFile = new File(System.getProperty("user.dir"), "vmimo_video_" + fps + "" + delta + "" + currentMessage + ".webm");
+					File videoFile = new File(System.getProperty("user.dir"), "vmimo_video_" + imageID + "_" +fps + "_" + delta + "_" + currentMessage + ".webm");
 					while(!videoFile.exists()){/*waiting*/}
-					String[] options = {":file-caching=300", ":network-caching=300",
-			                ":sout = #transcode{vcodec=x264,vb=800,scale=1,acodec=,fps=" + "" + "}:display :no-sout-rtp-sap :no-sout-standard-sap :ttl=1 :sout-keep"};
+					String[] options = {":file-caching=3000", ":network-caching=300",
+			                ":sout = #transcode{vcodec=VP8,vb=5000,scale=1,acodec=,fps=" + fps + "}"};
 					mediaPlayerComponent.getMediaPlayer().stop();
 					try {
 						Thread.sleep(1000);
@@ -222,6 +228,11 @@ public class VmimoAnalytics {
 						double accuracy = messagePack.getAccuracy(messagePack.binaryMessages[currentMessage], message);
 						System.out.println("Accuracy: " + accuracy);
 						messageAccuracySum += accuracy;
+						try {
+							Thread.sleep(250);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
 					}
 					
 					currentIndex ++;
