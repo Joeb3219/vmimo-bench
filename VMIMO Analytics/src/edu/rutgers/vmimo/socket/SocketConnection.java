@@ -19,6 +19,8 @@ public class SocketConnection extends ServerSocket implements Runnable{
 	private OutputStreamWriter osw = null;
 	private long timeOfLastMessage = 0;
 	private String lastMessage = "";
+	private long timeOfWaitForMessage = -1;
+	private static long waitForMessageTimeout = 20 * 1000;
 	final Object lockObject = new Object();
 	
 	public SocketConnection(int port) throws IOException{
@@ -59,22 +61,12 @@ public class SocketConnection extends ServerSocket implements Runnable{
 		catch(IOException e){e.printStackTrace();}
 	}
 	
-	/*public String getNextMessageOrWait(){
-		long savedSastMessageTime = timeOfLastMessage;
-		while(serverRunning && savedSastMessageTime < this.timeOfLastMessage){
-			System.out.println("Waiting for a new message");
-			if(currentClient == null || currentClient.isClosed()) break;
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {e.printStackTrace();}
-		}
-		return lastMessage;
-	}*/
-	
 	public String getNextMessageOrWait(){
 		synchronized(lockObject){
 			try {
+				timeOfWaitForMessage = System.currentTimeMillis();
 				lockObject.wait();
+				timeOfWaitForMessage = -1;
 				return lastMessage;
 			} catch (InterruptedException e) {e.printStackTrace();}
 		}
@@ -92,6 +84,12 @@ public class SocketConnection extends ServerSocket implements Runnable{
 					continue;
 				}
 				synchronized(lockObject){
+					if(timeOfWaitForMessage != -1 && System.currentTimeMillis() - timeOfWaitForMessage >= waitForMessageTimeout){
+						timeOfLastMessage = System.currentTimeMillis() / 1000L;
+						lastMessage = "SOCKET_TIMEOUT";
+						System.out.println("Waiting for socket to respond timed out: waited for " + (System.currentTimeMillis() - timeOfWaitForMessage)/1000 + " seconds");
+						lockObject.notify();
+					}
 					while (reader.ready()){
 						timeOfLastMessage = System.currentTimeMillis() / 1000L;
 						lastMessage = reader.readLine();

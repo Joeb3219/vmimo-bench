@@ -50,30 +50,6 @@ public class VmimoAnalytics {
 	public static void main(String[] args){
 		new NativeDiscovery().discover();
 		
-		//Testing
-		if(1 / 2 == 12 && false){
-			boolean[] reference = {false, false, true, true, true, true, false, false, false, true, true, true, false, true, false, false, true, true, true, false, false, false, false, true, true, false, true, true, false, false, true, true, false, true, false, false, false, true, true, false, false, true, false, false, true, true, false, false, false, false, false, true, false, true, true, true, false, false, true, false, true, true, false, false, false, true, false, true, false, true, false, false, true, false, true, false, false, true, true, true};
-			for(boolean b : reference){
-				if(b) System.out.print("1");
-				else System.out.print("0");
-			}
-			
-			System.out.println();
-			System.out.println(MessagePack.convertStringToBinary("abcdefghijk"));
-			
-			int[] ref = {1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0};
-			String ninetyFiveCorrectBinary = "";
-			for(int i : ref){
-				if(i == 1) ninetyFiveCorrectBinary += "1";
-				else ninetyFiveCorrectBinary += "0";
-			}
-			System.out.println(ninetyFiveCorrectBinary);
-			File mFile = new File(MessagePack._MESSAGES_SAVE_PATH);
-			try{mFile.createNewFile();}catch(Exception e){}
-			messagePack = new MessagePack(mFile);
-			System.out.println(messagePack.getAccuracy(ninetyFiveCorrectBinary, MessagePack.convertStringToBinary("abcdefghijk")));
-		}
-		
 		createDisplayWindow();
 		Thread socketThread = null;
 		
@@ -189,7 +165,6 @@ public class VmimoAnalytics {
 		    }
 		}).start();
 		
-		File reportsFolder = ReportUtils.generateNewReportFolder();
 		ArrayList<String> commandReportLines = new ArrayList<String>();
 		commandReportLines.add("COMMAND: test " + String.join(" ", params));
 		commandReportLines.add("Angle: " + angle + " degrees");
@@ -221,7 +196,9 @@ public class VmimoAnalytics {
 						picturesTaken ++;
 						socket.sendMessage("test=true;imgcount=" + picturesPerMessage);
 						String message = socket.getNextMessageOrWait();
+						if(message.equalsIgnoreCase("SOCKET_TIMEOUT")) return;
 						if(image == 0){
+							picturesTaken --;
 							System.out.println("Not saving the first one!");
 							continue;
 						}
@@ -239,7 +216,7 @@ public class VmimoAnalytics {
 					accuracySum += messageAccuracySum;
 					commandReportLines.add("Accuracy of '" + messagePack.messages[currentMessage] + "' " + delta + " delta @ " + fps + " FPS: " + ((double) ((int) messageAccuracySum / (picturesPerMessage) * 100) / 100) + "%");
 					System.out.println("PERCENTAGE COMPLETE: " + ( ( picturesTaken * 1.0 / totalPictures ) * 100.0 ) + "%");
-					videoFile.delete();
+					videoFile.deleteOnExit();
 				}
 				commandReportLines.add("Accuracy of " + delta + " delta @ " + fps + "FPS: " + ((double) ((int) accuracySum / (imagesPerDelta) * 100) / 100) + "%");
 				System.out.println("Accuracy of " + delta + " delta @ " + fps + "FPS: " + ((double) ((int) accuracySum / (imagesPerDelta) * 100) / 100) + "%");
@@ -248,6 +225,8 @@ public class VmimoAnalytics {
 		
 		mediaPlayerComponent.getMediaPlayer().stop();
 		commandReportLines.add(0, "RUN TIME: " + ((System.currentTimeMillis() / 1000) - startTime) + " seconds");
+		
+		File reportsFolder = ReportUtils.generateNewReportFolder();
 		ReportUtils.writeToFile(ReportUtils.createNewFile(reportsFolder, ReportUtils._REPORT_FILE_NAME), commandReportLines);
 		messagePack.generateMissedBitsReport(reportsFolder);
 		ReportUtils.copyMessagePackToReports(reportsFolder, messagePack);
