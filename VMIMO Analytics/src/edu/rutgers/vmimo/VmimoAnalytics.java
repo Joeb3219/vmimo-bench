@@ -11,11 +11,16 @@ import java.util.Scanner;
 
 import javax.swing.JFrame;
 
+import matlabcontrol.MatlabConnectionException;
+import matlabcontrol.MatlabInvocationException;
+import matlabcontrol.MatlabProxy;
+import matlabcontrol.MatlabProxyFactory;
+
 import org.apache.commons.io.FileUtils;
 
-import edu.rutgers.vmimo.socket.SocketConnection;
 import uk.co.caprica.vlcj.component.EmbeddedMediaPlayerComponent;
 import uk.co.caprica.vlcj.discovery.NativeDiscovery;
+import edu.rutgers.vmimo.socket.SocketConnection;
 
 public class VmimoAnalytics {
 
@@ -24,6 +29,7 @@ public class VmimoAnalytics {
 	public static SocketConnection socket;
 	private static JFrame window;
 	private static EmbeddedMediaPlayerComponent mediaPlayerComponent;
+	private static boolean _TRAINING = true;
 	
 	/*
 	 * 
@@ -73,14 +79,17 @@ public class VmimoAnalytics {
 			if(command.equalsIgnoreCase("help")) loadHelpMessages();
 			else if(command.equalsIgnoreCase("flushCache")) flushCache();
 			else if(command.equalsIgnoreCase("newDevice")) newDevice();
+			else if(command.equalsIgnoreCase("train")) trainColours();
 			else if(command.startsWith("test")) initializeTest(command.substring(5).split(" "));
 			else System.out.println("Command not recognized: " + command);
 		}
 		try{
 			System.out.println("Shutting down server");
-			mediaPlayerComponent.getMediaPlayer().stop();
-			mediaPlayerComponent.release();
-			window.dispose();
+			if(!_TRAINING){
+				mediaPlayerComponent.getMediaPlayer().stop();
+				mediaPlayerComponent.release();
+				window.dispose();
+			}
 			socket.serverRunning = false;
 			socket.invalidateCurrentClient();
 			if(!socket.isClosed()) socket.close();
@@ -90,7 +99,7 @@ public class VmimoAnalytics {
 			}
 		}catch(Exception e){e.printStackTrace();}
 	}
-
+	
 	private static void createDisplayWindow(){
 		window = new JFrame("RU VMIMO Bench Display");
 		window.setBounds(100, 100, 560 + 100, 448 + 100);
@@ -117,7 +126,53 @@ public class VmimoAnalytics {
 		socket.invalidateCurrentClient();
 	}
 	
-	
+	private static void trainColours(){
+		if(socket.currentClient == null){
+			System.out.println("No testing device connected.");
+			return;
+		}
+		double[] accuracies = new double[2480];
+		String dir = "C:/Users/joeb3219/Downloads/matlab-master/matlab-master/Research/Differential_Metamers/videos/vid_";
+		
+		for(int i = 0; i < 2480; i ++){
+			System.out.println("Current: " + i + ", complete: " + (i / 2480.00) + "%");
+			File videoFile = new File(dir + (i + 1) + ".avi");
+			String[] options = {":file-caching=3000", ":network-caching=300",
+	                ":sout = #transcode{vcodec=VP8,vb=5000,scale=1,acodec=,fps=" + 6 + "}"};
+			mediaPlayerComponent.getMediaPlayer().stop();
+			
+			try {Thread.sleep(400);
+			} catch (InterruptedException e1) {e1.printStackTrace();}
+			
+			mediaPlayerComponent.getMediaPlayer().playMedia(videoFile.getAbsolutePath(), options);
+			while(!mediaPlayerComponent.getMediaPlayer().isPlaying()){ //Wait until video actually playing
+				try{Thread.sleep(50);}catch(Exception e){e.printStackTrace();}
+			}
+			
+			String message = "";
+			do{
+				socket.sendMessage("test=true;imgcount=1");
+				message = socket.getNextMessageOrWait();
+			}while(message.equalsIgnoreCase("SOCKET_TIMEOUT"));
+			
+			double accuracy = messagePack.getAccuracy("10101010101010101010101010101010101010101010101010101010101010101010101010101010", message);
+			System.out.println(accuracy + "%: " + message);
+			accuracies[i] = accuracy;
+		}
+		
+//		try {
+//			MatlabProxyFactory factory = new MatlabProxyFactory(); 
+//			MatlabProxy proxy = factory.getProxy();
+//			proxy.eval("help");
+//
+//			
+//			
+//			proxy.disconnect();
+//		} catch (MatlabInvocationException | MatlabConnectionException e) {
+//			e.printStackTrace();
+//		}
+	}
+
 	//Example of params: 1 12 0 50 200 1 5 90 12
 	/**
 	 * Params array expected in the following order:
@@ -125,6 +180,10 @@ public class VmimoAnalytics {
 	 * @param params
 	 */
 	private static void initializeTest(String[] params){
+		if(!_TRAINING){
+			System.out.println("TRAINING INSTANCE! No testing allowed!");
+			return;
+		}
 		long startTime = System.currentTimeMillis() / 1000;
 		if(params.length < 7){
 			System.out.println("Not enough parameters: expected 9, got " + params.length + ".");
