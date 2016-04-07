@@ -2,7 +2,9 @@ package edu.rutgers.vmimo;
 
 import java.awt.Dimension;
 import java.awt.Toolkit;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -10,11 +12,6 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 import javax.swing.JFrame;
-
-import matlabcontrol.MatlabConnectionException;
-import matlabcontrol.MatlabInvocationException;
-import matlabcontrol.MatlabProxy;
-import matlabcontrol.MatlabProxyFactory;
 
 import org.apache.commons.io.FileUtils;
 
@@ -85,11 +82,9 @@ public class VmimoAnalytics {
 		}
 		try{
 			System.out.println("Shutting down server");
-			if(!_TRAINING){
-				mediaPlayerComponent.getMediaPlayer().stop();
-				mediaPlayerComponent.release();
-				window.dispose();
-			}
+			mediaPlayerComponent.getMediaPlayer().stop();
+			mediaPlayerComponent.release();
+			window.dispose();
 			socket.serverRunning = false;
 			socket.invalidateCurrentClient();
 			if(!socket.isClosed()) socket.close();
@@ -158,6 +153,25 @@ public class VmimoAnalytics {
 			double accuracy = messagePack.getAccuracy("10101010101010101010101010101010101010101010101010101010101010101010101010101010", message);
 			System.out.println(accuracy + "%: " + message);
 			accuracies[i] = accuracy;
+		}
+		
+		String output = "[";
+		for(int i = 0; i < 2048; i ++){
+			output += accuracies[i] + ", ";
+		}
+		try {
+			BufferedWriter outputWriter = new BufferedWriter(new FileWriter(new File(System.getProperty("user.dir"), "training_accuracies.txt")));
+			outputWriter.write(output + "]");
+			outputWriter.newLine();
+			for(int i = 0; i < 2048; i ++){
+				outputWriter.write(accuracies[i] + "");
+				outputWriter.newLine();
+			}
+			outputWriter.flush();
+			outputWriter.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		
 //		try {
