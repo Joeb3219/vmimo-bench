@@ -1,5 +1,6 @@
 package edu.rutgers.vmimo;
 
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.io.BufferedWriter;
@@ -76,7 +77,7 @@ public class VmimoAnalytics {
 			if(command.equalsIgnoreCase("help")) loadHelpMessages();
 			else if(command.equalsIgnoreCase("flushCache")) flushCache();
 			else if(command.equalsIgnoreCase("newDevice")) newDevice();
-			else if(command.equalsIgnoreCase("train")) trainColours();
+			else if(command.startsWith("train")) trainColours(Integer.parseInt(command.split(" ")[1]), Integer.parseInt(command.split(" ")[2]), Integer.parseInt(command.split(" ")[3]));
 			else if(command.startsWith("test")) initializeTest(command.substring(5).split(" "));
 			else System.out.println("Command not recognized: " + command);
 		}
@@ -97,13 +98,15 @@ public class VmimoAnalytics {
 	
 	private static void createDisplayWindow(){
 		window = new JFrame("RU VMIMO Bench Display");
-		window.setBounds(100, 100, 560 + 100, 448 + 100);
-		//window.setExtendedState(JFrame.MAXIMIZED_BOTH);
+		window.setSize(400, 360);
 		window.setAlwaysOnTop(true);
+		window.setUndecorated(true);
 		Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
 		window.setLocation(dim.width/2-window.getSize().width/2, dim.height/2-window.getSize().height/2);
 		mediaPlayerComponent = new EmbeddedMediaPlayerComponent();
 		mediaPlayerComponent.getMediaPlayer().setRepeat(true);
+		mediaPlayerComponent.setSize(400, 360);
+		mediaPlayerComponent.setBounds(0, 0, 400, 360);
         window.setContentPane(mediaPlayerComponent);
 		window.setVisible(true);
 	}
@@ -121,50 +124,63 @@ public class VmimoAnalytics {
 		socket.invalidateCurrentClient();
 	}
 	
-	private static void trainColours(){
+	private static void trainColours(int start, int end, int offset){
 		if(socket.currentClient == null){
 			System.out.println("No testing device connected.");
 			return;
 		}
-		double[] accuracies = new double[2480];
-		String dir = "C:/Users/joeb3219/Downloads/matlab-master/matlab-master/Research/Differential_Metamers/videos/vid_";
+		String[] messages = new String[end - start];
+		double[] accuracies = new double[(end - start)];
+		String dir = "C:/Users/joeb3219/Downloads/matlab-master(1)/matlab-master/Research/Differential_Metamers/videos/vid_";
 		
-		for(int i = 0; i < 2480; i ++){
+		for(int i = start; i < end; i ++){
 			System.out.println("Current: " + i + ", complete: " + (i / 2480.00) + "%");
 			File videoFile = new File(dir + (i + 1) + ".avi");
+			System.out.println("Current: " + i + ", complete: " + (i / 2480.00) + "%; " + videoFile.getAbsolutePath());
 			String[] options = {":file-caching=3000", ":network-caching=300",
-	                ":sout = #transcode{vcodec=VP8,vb=5000,scale=1,acodec=,fps=" + 6 + "}"};
+	                ":sout = #transcode{vcodec=mp1v,vb=5000,scale=1,acodec=,fps=" + 6 + "}:std{access=file, mux=avi, dst}'"};
 			mediaPlayerComponent.getMediaPlayer().stop();
 			
-			try {Thread.sleep(400);
+			try {Thread.sleep(250);
 			} catch (InterruptedException e1) {e1.printStackTrace();}
 			
 			mediaPlayerComponent.getMediaPlayer().playMedia(videoFile.getAbsolutePath(), options);
 			while(!mediaPlayerComponent.getMediaPlayer().isPlaying()){ //Wait until video actually playing
 				try{Thread.sleep(50);}catch(Exception e){e.printStackTrace();}
 			}
-			
 			String message = "";
 			do{
 				socket.sendMessage("test=true;imgcount=1");
 				message = socket.getNextMessageOrWait();
 			}while(message.equalsIgnoreCase("SOCKET_TIMEOUT"));
+			do{
+				socket.sendMessage("test=true;imgcount=1");
+				message = socket.getNextMessageOrWait();
+			}while(message.equalsIgnoreCase("SOCKET_TIMEOUT"));
+			messages[i - offset] = message;
 			
-			double accuracy = messagePack.getAccuracy("10101010101010101010101010101010101010101010101010101010101010101010101010101010", message);
+			double accuracy = messagePack.getAccuracy("10101010100101010101101010101001010101011010101010010101010110101010100101010101", message);
 			System.out.println(accuracy + "%: " + message);
-			accuracies[i] = accuracy;
+			accuracies[i - offset] = accuracy;
+			
+			try {Thread.sleep(2000);
+			} catch (InterruptedException e1) {e1.printStackTrace();}
 		}
 		
 		String output = "[";
-		for(int i = 0; i < 2048; i ++){
-			output += accuracies[i] + ", ";
+		for(int i = start; i < end; i ++){
+			output += accuracies[i - offset] + ", ";
 		}
 		try {
-			BufferedWriter outputWriter = new BufferedWriter(new FileWriter(new File(System.getProperty("user.dir"), "training_accuracies.txt")));
+			BufferedWriter outputWriter = new BufferedWriter(new FileWriter(new File(System.getProperty("user.dir"), "training_accuracies_off_" + offset + ".txt")));
 			outputWriter.write(output + "]");
 			outputWriter.newLine();
-			for(int i = 0; i < 2048; i ++){
-				outputWriter.write(accuracies[i] + "");
+			for(int i = start; i < end; i ++){
+				outputWriter.write(accuracies[i - offset] + "");
+				outputWriter.newLine();
+			}
+			for(int i = start; i < end; i ++){
+				outputWriter.write(i + " " + messages[i - offset]);
 				outputWriter.newLine();
 			}
 			outputWriter.flush();

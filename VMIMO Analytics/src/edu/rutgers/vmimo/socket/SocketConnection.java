@@ -20,7 +20,7 @@ public class SocketConnection extends ServerSocket implements Runnable{
 	private long timeOfLastMessage = 0;
 	private String lastMessage = "";
 	private long timeOfWaitForMessage = -1;
-	private static long waitForMessageTimeout = 20 * 1000;
+	private static long waitForMessageTimeout = 200 * 1000;
 	final Object lockObject = new Object();
 	
 	public SocketConnection(int port) throws IOException{
