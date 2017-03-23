@@ -1,4 +1,4 @@
-package edu.rutgers.vmimo;
+package edu.rutgers.vmimo.message;
 
 import java.awt.Color;
 import java.awt.image.BufferedImage;
@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.Random;
 
 import javax.imageio.ImageIO;
+
+import edu.rutgers.vmimo.ReportUtils;
 
 public class MessagePack {
 

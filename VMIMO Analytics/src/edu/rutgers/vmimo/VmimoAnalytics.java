@@ -1,10 +1,11 @@
 package edu.rutgers.vmimo;
 
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Toolkit;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -16,21 +17,28 @@ import javax.swing.JFrame;
 
 import org.apache.commons.io.FileUtils;
 
+import edu.rutgers.vmimo.message.MessageOutput;
+import edu.rutgers.vmimo.message.MessagePack;
+import edu.rutgers.vmimo.message.MessagePanel;
+import edu.rutgers.vmimo.socket.SocketConnection;
 import uk.co.caprica.vlcj.component.EmbeddedMediaPlayerComponent;
 import uk.co.caprica.vlcj.discovery.NativeDiscovery;
-import edu.rutgers.vmimo.socket.SocketConnection;
 
 public class VmimoAnalytics {
 
+	
+	public static final int WIDTH = 400, HEIGHT = 360;
+	public static int FPS = 6;
 	public static final Scanner in = new Scanner(System.in);
 	public static MessagePack messagePack;
 	public static SocketConnection socket;
 	private static JFrame window;
 	private static EmbeddedMediaPlayerComponent mediaPlayerComponent;
 	private static boolean _TRAINING = true;
+	public static MessageOutput currentMessage;
+	private static ArrayList<int[]> colorPairs = new ArrayList<int[]>();
 	
 	/*
-	 * 
 	 * Proposed Workflow:
 	 * 
 	 * - User begins bench by starting Java program.
@@ -61,6 +69,7 @@ public class VmimoAnalytics {
 			File messagesFile = new File(MessagePack._MESSAGES_SAVE_PATH);
 			messagesFile.createNewFile();
 			messagePack = new MessagePack(messagesFile);
+			parseColorFile();
 		}catch(IOException e){e.printStackTrace();}
 		
 		try{
@@ -77,14 +86,16 @@ public class VmimoAnalytics {
 			if(command.equalsIgnoreCase("help")) loadHelpMessages();
 			else if(command.equalsIgnoreCase("flushCache")) flushCache();
 			else if(command.equalsIgnoreCase("newDevice")) newDevice();
-			else if(command.startsWith("train")) trainColours(Integer.parseInt(command.split(" ")[1]), Integer.parseInt(command.split(" ")[2]), Integer.parseInt(command.split(" ")[3]));
+			else if(command.startsWith("train")) trainColours(Integer.parseInt(command.split(" ")[1]), Integer.parseInt(command.split(" ")[2]));
 			else if(command.startsWith("test")) initializeTest(command.substring(5).split(" "));
 			else System.out.println("Command not recognized: " + command);
 		}
 		try{
 			System.out.println("Shutting down server");
-			mediaPlayerComponent.getMediaPlayer().stop();
-			mediaPlayerComponent.release();
+			if(mediaPlayerComponent != null){
+				mediaPlayerComponent.getMediaPlayer().stop();
+				mediaPlayerComponent.release();
+			}
 			window.dispose();
 			socket.serverRunning = false;
 			socket.invalidateCurrentClient();
@@ -96,18 +107,33 @@ public class VmimoAnalytics {
 		}catch(Exception e){e.printStackTrace();}
 	}
 	
+	private static void parseColorFile(){
+		try{
+			BufferedReader bufferedReader = new BufferedReader(new FileReader(new File("colors.txt")));
+			String line;
+			while ((line = bufferedReader.readLine()) != null) {
+				String[] parts = line.split(":");
+				int[] pair = {Integer.parseInt(parts[0], 16), Integer.parseInt(parts[1], 16)};
+				colorPairs.add(pair);
+			}
+			bufferedReader.close();
+		}catch(IOException e){e.printStackTrace();}
+	}
+	
 	private static void createDisplayWindow(){
 		window = new JFrame("RU VMIMO Bench Display");
-		window.setSize(400, 360);
+		window.setSize(WIDTH, HEIGHT);
 		window.setAlwaysOnTop(true);
 		window.setUndecorated(true);
+		window.add(new MessagePanel());
+		window.pack();
 		Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
 		window.setLocation(dim.width/2-window.getSize().width/2, dim.height/2-window.getSize().height/2);
-		mediaPlayerComponent = new EmbeddedMediaPlayerComponent();
+		/*mediaPlayerComponent = new EmbeddedMediaPlayerComponent();
 		mediaPlayerComponent.getMediaPlayer().setRepeat(true);
-		mediaPlayerComponent.setSize(400, 360);
-		mediaPlayerComponent.setBounds(0, 0, 400, 360);
-        window.setContentPane(mediaPlayerComponent);
+		mediaPlayerComponent.setSize(WIDTH, HEIGHT);
+		mediaPlayerComponent.setBounds(0, 0, WIDTH, HEIGHT);*/
+        //window.setContentPane(mediaPlayerComponent);
 		window.setVisible(true);
 	}
 	
@@ -124,44 +150,43 @@ public class VmimoAnalytics {
 		socket.invalidateCurrentClient();
 	}
 	
-	private static void trainColours(int start, int end, int offset){
+	private static void trainColours(int start, int end){
 		if(socket.currentClient == null){
 			System.out.println("No testing device connected.");
+			//return;
+		}
+		
+		if(end > colorPairs.size()){
+			System.out.println("Requested to test color pair " + end + " but we only have " + colorPairs.size());
 			return;
 		}
-		String[] messages = new String[end - start];
+		
+		String[] receivedMessages = new String[end - start];
 		double[] accuracies = new double[(end - start)];
-		String dir = "C:/Users/joeb3219/Downloads/matlab-master(1)/matlab-master/Research/Differential_Metamers/videos/vid_";
+		MessageOutput[] messageOutputs = new MessageOutput[end - start];
+		
+		for(int i = 0; i < end - start; i ++){
+			int[] colorPair = colorPairs.get(i + start);
+			messageOutputs[i] = new MessageOutput("10101010100101010101101010101001010101011010101010010101010110101010100101010101", colorPair[0], colorPair[1]);
+		}
 		
 		for(int i = start; i < end; i ++){
-			System.out.println("Current: " + i + ", complete: " + (i / 2480.00) + "%");
-			File videoFile = new File(dir + (i + 1) + ".avi");
-			System.out.println("Current: " + i + ", complete: " + (i / 2480.00) + "%; " + videoFile.getAbsolutePath());
-			String[] options = {":file-caching=3000", ":network-caching=300",
-	                ":sout = #transcode{vcodec=mp1v,vb=5000,scale=1,acodec=,fps=" + 6 + "}:std{access=file, mux=avi, dst}'"};
-			mediaPlayerComponent.getMediaPlayer().stop();
-			
-			try {Thread.sleep(250);
-			} catch (InterruptedException e1) {e1.printStackTrace();}
-			
-			mediaPlayerComponent.getMediaPlayer().playMedia(videoFile.getAbsolutePath(), options);
-			while(!mediaPlayerComponent.getMediaPlayer().isPlaying()){ //Wait until video actually playing
-				try{Thread.sleep(50);}catch(Exception e){e.printStackTrace();}
-			}
-			String message = "";
+			currentMessage = messageOutputs[i - start];
+			String receivedMessage = "";
+			/*do{
+				socket.sendMessage("test=true;imgcount=1");
+				receivedMessage = socket.getNextMessageOrWait();
+			}while(receivedMessage.equalsIgnoreCase("SOCKET_TIMEOUT"));
 			do{
 				socket.sendMessage("test=true;imgcount=1");
-				message = socket.getNextMessageOrWait();
-			}while(message.equalsIgnoreCase("SOCKET_TIMEOUT"));
-			do{
-				socket.sendMessage("test=true;imgcount=1");
-				message = socket.getNextMessageOrWait();
-			}while(message.equalsIgnoreCase("SOCKET_TIMEOUT"));
-			messages[i - offset] = message;
+				receivedMessage = socket.getNextMessageOrWait();
+			}while(receivedMessage.equalsIgnoreCase("SOCKET_TIMEOUT"));*/
+			receivedMessage = "10101010100101010101101010101001010101011010101010010101010110101010100101010101";
+			receivedMessages[i - start] = receivedMessage;
 			
-			double accuracy = messagePack.getAccuracy("10101010100101010101101010101001010101011010101010010101010110101010100101010101", message);
-			System.out.println(accuracy + "%: " + message);
-			accuracies[i - offset] = accuracy;
+			double accuracy = messagePack.getAccuracy("10101010100101010101101010101001010101011010101010010101010110101010100101010101", receivedMessage);
+			System.out.println(accuracy + "%: " + receivedMessage);
+			accuracies[i - start] = accuracy;
 			
 			try {Thread.sleep(2000);
 			} catch (InterruptedException e1) {e1.printStackTrace();}
@@ -169,18 +194,18 @@ public class VmimoAnalytics {
 		
 		String output = "[";
 		for(int i = start; i < end; i ++){
-			output += accuracies[i - offset] + ", ";
+			output += accuracies[i - start] + ", ";
 		}
 		try {
-			BufferedWriter outputWriter = new BufferedWriter(new FileWriter(new File(System.getProperty("user.dir"), "training_accuracies_off_" + offset + ".txt")));
+			BufferedWriter outputWriter = new BufferedWriter(new FileWriter(new File(System.getProperty("user.dir"), "training_accuracies_off_" + start + ".txt")));
 			outputWriter.write(output + "]");
 			outputWriter.newLine();
 			for(int i = start; i < end; i ++){
-				outputWriter.write(accuracies[i - offset] + "");
+				outputWriter.write(accuracies[i - start] + "");
 				outputWriter.newLine();
 			}
 			for(int i = start; i < end; i ++){
-				outputWriter.write(i + " " + messages[i - offset]);
+				outputWriter.write(i + " " + receivedMessages[i - start]);
 				outputWriter.newLine();
 			}
 			outputWriter.flush();
@@ -189,18 +214,6 @@ public class VmimoAnalytics {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-//		try {
-//			MatlabProxyFactory factory = new MatlabProxyFactory(); 
-//			MatlabProxy proxy = factory.getProxy();
-//			proxy.eval("help");
-//
-//			
-//			
-//			proxy.disconnect();
-//		} catch (MatlabInvocationException | MatlabConnectionException e) {
-//			e.printStackTrace();
-//		}
 	}
 
 	//Example of params: 1 12 0 50 200 1 5 90 12

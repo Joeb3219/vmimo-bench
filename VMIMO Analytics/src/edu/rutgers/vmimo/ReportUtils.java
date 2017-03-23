@@ -11,6 +11,8 @@ import java.util.Date;
 
 import org.apache.commons.io.FileUtils;
 
+import edu.rutgers.vmimo.message.MessagePack;
+
 public class ReportUtils {
 
 	public static final String _REPORTS_PATH = "reports";
